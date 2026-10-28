@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Cup of Coffee</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --cyan: #7fdbff;
+      --pink: #ff4f7b;
+      --gold: #ffd166;
+    }
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;          /* no scrolling, the game IS the page */
+      background: #03070f;
+      color: var(--cyan);
+      font-family: 'VT323', monospace;
+      font-size: 24px;
+      text-align: center;
+    }
+
+    /* The ballpark fills the whole window, behind everything */
+    #field {
+      position: fixed;
+      top: 0;
+      left: 0;
+      image-rendering: pixelated;
+      z-index: 0;
+    }
+
+    /* Old TV scanlines over everything */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(to bottom, rgba(0,0,0,.16) 0 2px, transparent 2px 4px);
+      z-index: 10;
+    }
+
+    /* Soft dark edges, like an old TV */
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55) 100%);
+      z-index: 9;
+    }
+
+    /* Everything you read floats over the night sky */
+    .hud {
+      position: fixed;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(620px, 100% - 32px);
+      padding-top: 22px;
+      z-index: 5;
+    }
+
+    h1 {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(20px, 4vw, 34px);
+      color: var(--pink);
+      text-shadow: 3px 0 var(--cyan), 0 0 24px rgba(255,79,123,.7);
+      margin: 0 0 16px;
+    }
+
+    #round {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 11px;
+      color: var(--gold);
+      letter-spacing: 2px;
+      margin: 0 0 8px;
+      text-shadow: 0 0 10px rgba(255,209,102,.6);
+    }
+
+    #timer-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      max-width: 420px;
+      margin: 0 auto 14px;
+    }
+    #timer-bar {
+      flex: 1;
+      height: 10px;
+      background: rgba(3,7,15,.7);
+      border: 2px solid var(--cyan);
+      box-shadow: 0 0 10px rgba(127,219,255,.4);
+    }
+    #timer-fill {
+      height: 100%;
+      width: 100%;
+      background: var(--cyan);
+      transition: width 1s linear, background .3s;
+    }
+    #timer {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 11px;
+      width: 28px;
+    }
+
+    #question {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(14px, 2.6vw, 22px);
+      color: #fff;
+      line-height: 1.5;
+      margin: 0 0 16px;
+      text-shadow: 0 0 14px rgba(127,219,255,.7), 0 2px 0 #03070f;
+    }
+
+    #answer {
+      width: 100%;
+      max-width: 420px;
+      padding: 10px 16px;
+      font-family: 'VT323', monospace;
+      font-size: 28px;
+      text-align: center;
+      background: rgba(3,7,15,.75);
+      color: #fff;
+      border: 3px solid var(--cyan);
+      outline: none;
+      box-shadow: 0 0 14px rgba(127,219,255,.35);
+    }
+    #answer:focus { box-shadow: 0 0 22px rgba(127,219,255,.7); }
+    #answer:disabled { opacity: .5; }
+
+    #result {
+      min-height: 32px;
+      margin: 10px 0 0;
+      font-size: 26px;
+      text-shadow: 0 2px 0 #03070f, 0 0 10px rgba(127,219,255,.5);
+    }
+
+    #result.homer {
+      color: var(--gold);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      text-shadow: 0 0 16px var(--gold);
+      animation: pop .4s ease-out;
+    }
+    @keyframes pop {
+      from { transform: scale(.6); opacity: 0; }
+      to   { transform: scale(1);  opacity: 1; }
+    }
+
+    /* Final box-score list gets a dark panel so it's easy to read */
+    #result.final {
+      background: rgba(3,7,15,.8);
+      border: 3px solid var(--cyan);
+      padding: 10px 14px;
+      font-size: 22px;
+      line-height: 1.3;
+    }
+
+    /* Gold flash over the whole screen on a home run */
+    #flash {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(circle at 50% 30%, rgba(255,209,102,.55), transparent 70%);
+      opacity: 0;
+      z-index: 4;
+    }
+    body.homer-flash #flash { animation: homerFlash 1.3s ease-out; }
+    @keyframes homerFlash {
+      0%   { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    /* Whole field shakes on a strikeout */
+    body.shake #field { animation: shake .45s; }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-12px); }
+      40% { transform: translateX(12px); }
+      60% { transform: translateX(-7px); }
+      80% { transform: translateX(7px); }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="field"></canvas>
+  <div id="flash"></div>
+
+  <div class="hud">
+    <h1>CUP OF COFFEE</h1>
+    <p id="round"></p>
+    <div id="timer-row">
+      <div id="timer-bar"><div id="timer-fill"></div></div>
+      <div id="timer"></div>
+    </div>
+    <h2 id="question"></h2>
+    <input id="answer" placeholder="Type a player..." autocomplete="off">
+    <p id="result"></p>
+  </div>
+
+  <script src="players.js"></script>
+  <script src="field.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
